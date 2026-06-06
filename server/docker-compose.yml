@@ -1,0 +1,29 @@
+# FunASR 实时语音识别服务
+# 使用前：docker compose up -d
+# 首次启动会自动从 ModelScope 下载模型（约 2-4 GB），请耐心等待。
+#
+# 服务启动后监听 ws://0.0.0.0:10095（无 TLS），
+# 在 app_config.h 中把 FUNASR_WS_URL 改成本机 IP，如 ws://192.168.1.100:10095
+
+services:
+  funasr:
+    image: registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12
+    container_name: funasr-server
+    ports:
+      - "10095:10095"
+    volumes:
+      - funasr-models:/opt/funasr/models
+    restart: unless-stopped
+    command: >
+      bash /home/root/funasr/run_server.sh
+      --certfile 0
+      --download-model-dir /opt/funasr/models
+      --model-dir     damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online
+      --online-model-dir damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online
+      --vad-model-dir damo/speech_fsmn_vad_zh-cn-16k-common-pytorch
+      --punc-model-dir damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch
+      --decoder-thread-num 4
+      --io-thread-num 4
+
+volumes:
+  funasr-models:

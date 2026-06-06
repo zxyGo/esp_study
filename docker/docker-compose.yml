@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  funasr-online:
+    image: registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12
+    container_name: funasr-online
+    ports:
+      - "10095:10095"
+    volumes:
+      - ./models:/workspace/models
+      - ./start_server.sh:/start_server.sh:ro
+    entrypoint: ["bash", "/start_server.sh"]
+    restart: unless-stopped
+    shm_size: '1g'
+    environment:
+      - MODELSCOPE_CACHE=/workspace/models

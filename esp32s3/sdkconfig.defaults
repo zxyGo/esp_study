@@ -1,0 +1,6 @@
+# LVGL 示例会显著增加固件体积；教程项目只使用自己的界面。
+CONFIG_LV_BUILD_EXAMPLES=n
+
+# LVGL + 中文字体会让固件变大；16MB Flash 开发板建议使用大 app 分区。
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+CONFIG_PARTITION_TABLE_FILENAME="partitions_singleapp_large.csv"
