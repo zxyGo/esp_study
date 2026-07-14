@@ -6,6 +6,7 @@
 #include "cJSON.h"
 #include "app_config.h"
 #include "app_lcd.h"
+#include "app_llm.h"
 #include "app_stt.h"
 
 /*
@@ -89,6 +90,7 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base,
                     ESP_LOGI(TAG, "[离线] %s", s_last_text);
                     app_lcd_show_transcript_hint(s_last_text);
                     app_lcd_status_line(96, "", C_BLACK); /* 清空在线行 */
+                    app_llm_ask(s_last_text);
                 }
             }
             cJSON_Delete(root);

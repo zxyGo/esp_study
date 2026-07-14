@@ -8,6 +8,7 @@
 #include "app_mic.h"
 #include "app_wifi.h"
 #include "app_stt.h"
+#include "app_llm.h"
 
 static const char *TAG = "APP_MAIN";
 
@@ -39,8 +40,9 @@ void app_main(void)
         int frames = app_mic_read_pcm16(pcm, STT_CHUNK_FRAMES, &peak);
 
         /* 不等待 Wi-Fi 也持续读取麦克风，方便先确认 INMP441 接线和音量是否正常。
-         * Wi-Fi 连上后再启动语音转文字；如果 API Key 没填，app_stt_start() 会在屏幕提示。 */
+         * Wi-Fi 连上后再启动语音识别与大模型后台任务；API Key 只保存在 PC 网关。 */
         if (!stt_started && app_wifi_is_connected()) {
+            app_llm_start();
             app_stt_start();
             stt_started = true;
         }

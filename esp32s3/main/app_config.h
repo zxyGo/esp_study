@@ -62,3 +62,12 @@
  * 先在 PC 上执行 cd server && docker compose up -d，
  * 再把下面的 IP 换成运行 Docker 的那台机器的局域网 IP。 */
 #define FUNASR_WS_URL  "ws://10.10.1.73:10095"
+
+/* 大模型请求经由 PC 上的局域网网关转发，API Key 不会写入固件。
+ * IP 与 FUNASR_WS_URL 使用同一台运行 Docker Compose 的电脑。 */
+#define LLM_GATEWAY_URL        "http://10.10.1.73:10096/chat"
+#define LLM_SESSION_ID         "esp32s3-voice-assistant"
+#define LLM_REQUEST_TIMEOUT_MS 70000
+#define LLM_PROMPT_MAX_BYTES   256
+#define LLM_RESPONSE_MAX_BYTES 4096
+#define LLM_ANSWER_MAX_BYTES   1024

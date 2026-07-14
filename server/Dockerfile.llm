@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY llm_gateway.py /app/llm_gateway.py
+
+EXPOSE 10096
+CMD ["python", "-u", "/app/llm_gateway.py"]

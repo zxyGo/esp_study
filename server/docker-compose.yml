@@ -48,5 +48,31 @@ services:
       - --hotword
       - /workspace/FunASR/runtime/websocket/hotwords.txt
 
+  llm-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.llm
+    container_name: funasr-llm-gateway
+    ports:
+      - "10096:10096"
+    environment:
+      LLM_API_BASE: ${LLM_API_BASE:-http://host.docker.internal:11434/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:3b}
+      LLM_SYSTEM_PROMPT: ${LLM_SYSTEM_PROMPT:-你是运行在 ESP32 语音助手中的中文助理。回答自然、准确、简短，默认不超过80个汉字；只输出纯文本，不使用Markdown或表情。}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-160}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
+      LLM_THINKING: ${LLM_THINKING:-}
+      LLM_HISTORY_TURNS: ${LLM_HISTORY_TURNS:-4}
+      LLM_REQUEST_TIMEOUT: ${LLM_REQUEST_TIMEOUT:-60}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10096/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
 volumes:
   funasr-models:

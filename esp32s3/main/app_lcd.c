@@ -156,7 +156,7 @@ void app_lcd_show_boot(void)
 
         lv_obj_t *sub = lv_label_create(scr);
         apply_chinese_font(sub);
-        lv_label_set_text(sub, "实时语音转文字");
+        lv_label_set_text(sub, "本地语音助手");
         lv_obj_set_style_text_color(sub, lv_palette_main(LV_PALETTE_CYAN), 0);
         lv_obj_align(sub, LV_ALIGN_CENTER, 0, 28);
 
@@ -173,22 +173,23 @@ void app_lcd_draw_stt_frame(void)
 
         s_title = lv_label_create(scr);
         apply_chinese_font(s_title);
-        lv_label_set_text(s_title, "实时语音");
+        lv_label_set_text(s_title, "语音助手");
         lv_obj_set_style_text_color(s_title, lv_palette_main(LV_PALETTE_CYAN), 0);
-        lv_obj_align(s_title, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_align(s_title, LV_ALIGN_TOP_MID, 0, 4);
 
-        create_label(&s_wifi_label, "网络:等待", 44, C_BLACK);
-        create_label(&s_ws_label, "服务:等待", 80, C_BLACK);
-        create_label(&s_mic_label, "麦克风:  0%", 116, C_GREEN);
-        create_label(&s_hint_label, "等待识别结果", 188, C_ORANGE);
+        create_label(&s_wifi_label, "网络:等待", 30, C_BLACK);
+        create_label(&s_ws_label, "服务:等待", 54, C_BLACK);
+        create_label(&s_mic_label, "麦克风:  0%", 78, C_GREEN);
+        create_label(&s_hint_label, "等待提问", 216, C_ORANGE);
 
         s_text_label = lv_label_create(scr);
         apply_chinese_font(s_text_label);
         lv_label_set_text(s_text_label, "");
         lv_obj_set_width(s_text_label, LCD_W - 16);
+        lv_obj_set_height(s_text_label, 104);
         lv_label_set_long_mode(s_text_label, LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_color(s_text_label, lv_palette_main(LV_PALETTE_ORANGE), 0);
-        lv_obj_align(s_text_label, LV_ALIGN_TOP_LEFT, 8, 148);
+        lv_obj_align(s_text_label, LV_ALIGN_TOP_LEFT, 8, 106);
 
         lvgl_port_unlock();
     }
@@ -214,9 +215,25 @@ void app_lcd_show_transcript_hint(const char *text)
     if (lvgl_port_lock(0)) {
         if (s_text_label) {
             lv_label_set_text(s_text_label, text);
+            lv_obj_set_style_text_color(s_text_label, lv_palette_main(LV_PALETTE_ORANGE), 0);
         }
         if (s_hint_label) {
-            lv_label_set_text(s_hint_label, "收到文字");
+            lv_label_set_text(s_hint_label, "收到问题");
+        }
+        lvgl_port_unlock();
+    }
+}
+
+void app_lcd_show_llm_answer(const char *text)
+{
+    if (lvgl_port_lock(0)) {
+        if (s_text_label) {
+            lv_label_set_text(s_text_label, text);
+            lv_obj_set_style_text_color(s_text_label, lv_palette_main(LV_PALETTE_CYAN), 0);
+        }
+        if (s_hint_label) {
+            lv_label_set_text(s_hint_label, "大模型回答");
+            lv_obj_set_style_text_color(s_hint_label, lv_palette_main(LV_PALETTE_GREEN), 0);
         }
         lvgl_port_unlock();
     }

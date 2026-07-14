@@ -1,2 +1,4 @@
 /esp32s3/.vscode/
 /esp32s3/build/
+/server/.env
+__pycache__/
