@@ -12,18 +12,41 @@ services:
     ports:
       - "10095:10095"
     volumes:
-      - funasr-models:/opt/funasr/models
+      - funasr-models:/workspace/models
     restart: unless-stopped
-    command: >
-      bash /home/root/funasr/run_server.sh
-      --certfile 0
-      --download-model-dir /opt/funasr/models
-      --model-dir     damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online
-      --online-model-dir damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online
-      --vad-model-dir damo/speech_fsmn_vad_zh-cn-16k-common-pytorch
-      --punc-model-dir damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch
-      --decoder-thread-num 4
-      --io-thread-num 4
+    shm_size: "1g"
+    # 镜像内的包装脚本路径在不同版本间有变化，直接启动 2pass 服务二进制更稳定。
+    entrypoint:
+      - /workspace/FunASR/runtime/websocket/build/bin/funasr-wss-server-2pass
+    command:
+      - --download-model-dir
+      - /workspace/models
+      - --model-dir
+      - damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx
+      - --online-model-dir
+      - damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx
+      - --vad-dir
+      - damo/speech_fsmn_vad_zh-cn-16k-common-onnx
+      - --punc-dir
+      - damo/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-onnx
+      - --itn-dir
+      - thuduj12/fst_itn_zh
+      - --lm-dir
+      - damo/speech_ngram_lm_zh-cn-ai-wesp-fst
+      - --decoder-thread-num
+      - "4"
+      - --model-thread-num
+      - "1"
+      - --io-thread-num
+      - "4"
+      - --port
+      - "10095"
+      - --certfile
+      - ""
+      - --keyfile
+      - ""
+      - --hotword
+      - /workspace/FunASR/runtime/websocket/hotwords.txt
 
 volumes:
   funasr-models:

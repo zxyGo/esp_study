@@ -41,8 +41,11 @@ void app_mic_init(void)
 int app_mic_read_pcm16(int16_t *out, int max_frames, int32_t *peak_out)
 {
     size_t bytes_read = 0;
-    esp_err_t ret = i2s_channel_read(s_rx, s_pcm, sizeof(s_pcm), &bytes_read,
-                                     pdMS_TO_TICKS(100));
+    /* i2s_channel_read() 的超时参数单位是毫秒，不是 FreeRTOS tick。
+     * 这里若再调用 pdMS_TO_TICKS()，在 CONFIG_FREERTOS_HZ=100 时会把
+     * 100 ms 错缩短为 10 ms；而默认 240 帧 DMA 块在 16 kHz 下约需
+     * 15 ms 才完成，因此每次读取都会在首个 DMA 块到达前超时。 */
+    esp_err_t ret = i2s_channel_read(s_rx, s_pcm, sizeof(s_pcm), &bytes_read, 100);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "I2S 读取失败: %s，请检查 BCLK=%d、WS=%d、DIN=%d 接线",
                  esp_err_to_name(ret), MIC_BCLK, MIC_WS, MIC_DIN);

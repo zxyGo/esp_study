@@ -61,4 +61,4 @@
 /* FunASR 本地服务地址（无需 API Key）。
  * 先在 PC 上执行 cd server && docker compose up -d，
  * 再把下面的 IP 换成运行 Docker 的那台机器的局域网 IP。 */
-#define FUNASR_WS_URL  "ws://192.168.1.100:10095"
+#define FUNASR_WS_URL  "ws://10.10.1.73:10095"
