@@ -209,8 +209,8 @@ void app_lcd_status_line(int y, const char *text, uint16_t color)
 
 void app_lcd_show_transcript_hint(const char *text)
 {
-    /* text 是 UTF-8 字符串，LVGL 会按当前 label 字体里的字模进行绘制。
-     * 如果某个汉字没显示出来，请把它加入 main/fonts/app_chinese_chars.txt 后重新生成字体。 */
+    /* text 是 UTF-8 字符串，字体已包含 GB2312 一级常用汉字。
+     * 生僻字仍可加入 main/fonts/app_chinese_chars.txt 后重新生成字体。 */
     if (lvgl_port_lock(0)) {
         if (s_text_label) {
             lv_label_set_text(s_text_label, text);
