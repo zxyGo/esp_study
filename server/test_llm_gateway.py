@@ -9,7 +9,8 @@ from llm_gateway import Config, Gateway
 
 class FakeResponse:
     def __init__(self, body):
-        self.body = io.BytesIO(json.dumps(body).encode())
+        data = body if isinstance(body, bytes) else json.dumps(body).encode()
+        self.body = io.BytesIO(data)
 
     def __enter__(self):
         return self
@@ -19,6 +20,15 @@ class FakeResponse:
 
     def read(self):
         return self.body.read()
+
+
+class FakeTts:
+    def __init__(self):
+        self.texts = []
+
+    def synthesize(self, text):
+        self.texts.append(text)
+        return b"\x01\x00\xff\x7f", 44100
 
 
 class GatewayTest(unittest.TestCase):
@@ -89,6 +99,22 @@ class GatewayTest(unittest.TestCase):
         gateway.chat("问题", "device-2")
         payload = json.loads(urlopen.call_args.args[0].data.decode())
         self.assertEqual(payload["thinking"], {"type": "disabled"})
+
+    def test_speech_uses_local_tts(self):
+        tts = FakeTts()
+        gateway = Gateway(Config(), tts_engine=tts)
+
+        self.assertEqual(gateway.speech("你好"), (b"\x01\x00\xff\x7f", 44100))
+        self.assertEqual(tts.texts, ["你好"])
+
+    def test_tts_target_peak_must_be_in_pcm_range(self):
+        with patch.dict(os.environ, {"TTS_TARGET_PEAK": "0"}):
+            with self.assertRaisesRegex(ValueError, "TTS_TARGET_PEAK"):
+                Config()
+
+        with patch.dict(os.environ, {"TTS_TARGET_PEAK": "1.1"}):
+            with self.assertRaisesRegex(ValueError, "TTS_TARGET_PEAK"):
+                Config()
 
 
 if __name__ == "__main__":

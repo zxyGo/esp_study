@@ -9,6 +9,7 @@
 #include "app_wifi.h"
 #include "app_stt.h"
 #include "app_llm.h"
+#include "app_speaker.h"
 
 static const char *TAG = "APP_MAIN";
 
@@ -17,6 +18,7 @@ void app_main(void)
     /* main.c 只负责整体流程：初始化硬件、联网、启动语音转写、循环发送音频。 */
     app_lcd_init();
     app_mic_init();
+    app_speaker_init();
 
     app_lcd_show_boot();
     vTaskDelay(pdMS_TO_TICKS(2000));
@@ -49,7 +51,10 @@ void app_main(void)
 
         /* 保存本次 UI 刷新周期内的最大值，避免只显示恰好采到的最后 30 ms。 */
         if (peak > display_peak) display_peak = peak;
-        app_stt_send_audio_chunk(pcm, frames);
+        /* 播放回答时不把扬声器声音送回 FunASR，避免形成自问自答循环。 */
+        if (!app_speaker_is_playing()) {
+            app_stt_send_audio_chunk(pcm, frames);
+        }
 
         TickType_t now = xTaskGetTickCount();
         if ((now - last_commit) >= pdMS_TO_TICKS(STT_COMMIT_MS)) {

@@ -1,6 +1,6 @@
 # ESP32-S3 本地语音助手（FunASR + 大模型）
 
-ESP32-S3 采集麦克风音频，通过 Wi-Fi 实时推送到本地 FunASR；完整识别文本再交给大模型，回答显示在 ST7789 屏幕上。默认连接电脑上的 Ollama，可在局域网内完全离线运行；也可以通过兼容网关切换到云端 OpenAI Chat Completions 接口，API Key 只保存在电脑端，不会写入固件。
+ESP32-S3 采集麦克风音频，通过 Wi-Fi 实时推送到本地 FunASR；完整识别文本再交给大模型，回答显示在 ST7789 屏幕上，并通过 MAX98357A 扬声器播放。语音合成使用电脑上的 sherpa-onnx + MeloTTS 中英双语模型，完全离线且没有按次调用费。大模型默认连接本机 Ollama，也可以切换到云端 OpenAI Chat Completions 兼容接口，API Key 只保存在电脑端，不会写入固件。
 
 ---
 
@@ -17,6 +17,8 @@ ESP32-S3  ── WebSocket :10095 ──▶ FunASR（VAD + Paraformer）
      └──────────────────────────▶       │ OpenAI 兼容接口
                                         ▼
 ST7789 屏幕 ◀───── 大模型回答 ───── Ollama / 云端模型
+     │
+     └── 本地 MeloTTS ── PCM16 ──▶ ESP32-S3 ── I2S ──▶ MAX98357A + 扬声器
 ```
 
 ---
@@ -25,7 +27,7 @@ ST7789 屏幕 ◀───── 大模型回答 ───── Ollama / 云端
 
 ### 第 0 步：准备大模型并启动服务端（PC 上）
 
-> 需要已安装 Docker Desktop。首次运行会自动下载模型，约 2-4 GB，请耐心等待。
+> 需要已安装 Docker Desktop。首次运行会下载 FunASR 模型约 2-4 GB，以及离线 TTS 模型约 163 MB，请耐心等待。
 
 默认配置使用宿主机 Ollama。先确保 Ollama 已启动，并准备模型：
 
@@ -56,7 +58,7 @@ docker compose logs -f funasr llm-gateway
 
 FunASR 监听 `ws://0.0.0.0:10095`，LLM 网关监听 `http://0.0.0.0:10096`；二者都只应暴露在可信局域网中。
 
-当前 Compose 配置运行 FunASR 2pass 服务，并加载离线识别、在线识别、VAD、标点、ITN 和语言模型。下载的语音模型保存在 Docker 命名卷 `funasr-models` 中，重建容器后无需重复下载。LLM 网关保留最近 4 轮对话上下文，可以通过 `.env` 调整。
+当前 Compose 配置运行 FunASR 2pass 服务，并加载离线识别、在线识别、VAD、标点、ITN 和语言模型。识别模型保存在 Docker 命名卷 `funasr-models` 中；MeloTTS 模型包含在构建后的网关镜像里，后续启动无需重复下载。LLM 网关保留最近 4 轮对话上下文，可以通过 `.env` 调整。
 
 ---
 
@@ -73,6 +75,9 @@ FunASR 监听 `ws://0.0.0.0:10095`，LLM 网关监听 `http://0.0.0.0:10096`；�
 
 /* LLM 网关使用同一台 PC 的局域网 IP */
 #define LLM_GATEWAY_URL "http://192.168.1.100:10096/chat"
+
+/* TTS 使用同一网关的 /tts 接口 */
+#define TTS_GATEWAY_URL "http://192.168.1.100:10096/tts"
 ```
 
 查看本机 IP（PowerShell）：
@@ -113,6 +118,20 @@ FunASR 监听 `ws://0.0.0.0:10095`，LLM 网关监听 `http://0.0.0.0:10096`；�
 
 如果引脚不同，只需修改 `main/app_config.h` 顶部的宏定义。
 
+#### MAX98357A 功放与扬声器
+
+| MAX98357A | ESP32-S3 | 说明 |
+|-----------|----------|------|
+| VIN       | 5V       | 建议使用开发板 5V，提高扬声器输出功率 |
+| GND       | GND      | 必须与 ESP32-S3 共地 |
+| BCLK      | GPIO15   | I2S 位时钟 |
+| LRC/WS    | GPIO16   | I2S 左右声道时钟 |
+| DIN       | GPIO7    | I2S 音频数据，ESP32-S3 输出；与接线图中的 G7 DIN 一致 |
+| SD / MODE | GPIO18（可选） | 接入时由固件输出高电平；这款模块默认已通过板载电阻使能并混合左右声道 |
+| SPK+ / SPK- | 扬声器两端 | 不要把任一扬声器端接 GND |
+
+建议使用 4Ω/3W 或 8Ω/1W 扬声器。图示紫色 MAX98357A 模块默认已使能并输出 `(L+R)/2`，`SD/MODE` 可以保持模块默认状态，也可以连接 GPIO18 由固件主动拉高；`GAIN` 保持悬空即为模块默认 9dB。固件会把单声道音频复制到左右声道，开机约 2 秒后会播放一段短测试音。
+
 ---
 
 ### 第 3 步：编译和烧录
@@ -147,7 +166,7 @@ cmd.exe /c "C:\esp\v5.4.4\esp-idf\export.bat && idf.py -p COM4 flash monitor"
 | 网络   | `网络:已连接`（绿色）|
 | 服务   | `服务:已连接`（绿色）|
 | 麦克风 | `麦克风: xx%`，按最近 300 ms 的峰值动态变化 |
-| 主区域 | 先显示识别问题和`正在思考`，随后显示大模型回答 |
+| 主区域 | 先显示识别问题和`正在思考`，随后显示并播放大模型回答 |
 
 串口同时打印：
 
@@ -156,9 +175,11 @@ I (xxxx) APP_STT: [在线] 你好
 I (xxxx) APP_STT: [离线] 你好，今天天气怎么样？
 I (xxxx) APP_LLM: 提问: 你好，今天天气怎么样？
 I (xxxx) APP_LLM: 回答: 我无法获取实时天气，但可以帮你分析天气信息。
+I (xxxx) APP_SPEAKER: 正在合成并播放回答
+I (xxxx) APP_SPEAKER: 语音播放完成
 ```
 
-`[在线]` 是流式实时片段，`[离线]` 是 VAD 检测到静音后的完整句子；只有完整句子会提交给大模型。模型请求在独立 FreeRTOS 任务中执行，不会阻塞麦克风采集和音频 WebSocket。
+`[在线]` 是流式实时片段，`[离线]` 是 VAD 检测到静音后的完整句子；只有完整句子会提交给大模型。模型请求和语音播放在独立 FreeRTOS 任务中执行，不会阻塞麦克风采集。播放期间固件会暂停向 FunASR 上传麦克风数据，并在结束后保留短暂回声保护时间，避免助手听见自己的回答后再次提问。
 
 音量百分比使用会自动回落的参考峰值：较大的声音会动态抬高基准，随后逐步恢复，因此上电尖峰不会把音量条长期锁在 0%。有非零采样但幅度不足 1% 时会显示 1%，全零采样仍显示红色 0%。
 
@@ -175,6 +196,7 @@ I (xxxx) APP_LLM: 回答: 我无法获取实时天气，但可以帮你分析天
 │   │   ├── app_mic.c/.h              # INMP441 I2S 初始化，输出 16 kHz PCM16
 │   │   ├── app_stt.c/.h              # FunASR WebSocket 客户端（2pass 流式协议）
 │   │   ├── app_llm.c/.h              # 异步调用局域网 LLM 网关
+│   │   ├── app_speaker.c/.h          # MAX98357A I2S 播放与 TTS HTTP 流
 │   │   ├── app_wifi.c/.h             # Wi-Fi 配网门户 + 重连
 │   │   ├── app_lcd.c/.h              # ST7789 + LVGL 界面
 │   │   ├── app_fonts.h               # LVGL 中文字体声明
@@ -189,6 +211,7 @@ I (xxxx) APP_LLM: 回答: 我无法获取实时天气，但可以帮你分析天
 └── server/
     ├── docker-compose.yml            # FunASR + LLM 网关编排
     ├── llm_gateway.py                # OpenAI 兼容网关与短期会话记忆
+    ├── requirements.txt              # sherpa-onnx 与 NumPy 版本
     ├── Dockerfile.llm
     └── .env.example                  # 模型服务配置示例
 ```
@@ -243,6 +266,14 @@ ESP32 向 `POST /chat` 发送：
 
 网关再调用上游的 `/v1/chat/completions`。`LLM_SYSTEM_PROMPT`、最大输出 token、温度和历史轮数均可在 `server/.env` 中配置。使用默认开启思考模式的模型（如智谱 GLM-4.7-Flash）进行短语音问答时，可设置 `LLM_THINKING=disabled`，防止输出 token 被思考过程耗尽而返回空回答。
 
+ESP32 随后向 `POST /tts` 发送回答文本：
+
+```json
+{"text":"你好，我是你的本地语音助手。"}
+```
+
+网关使用 sherpa-onnx 加载 `vits-melo-tts-zh_en`，返回 44.1 kHz、单声道、小端 PCM16，并将模型音量自动归一化到 `TTS_TARGET_PEAK`（这款 9dB 功放默认使用 0.25，避免削波失真）。响应头 `X-Audio-Sample-Rate` 标识采样率；ESP32 将完整音频缓存在 PSRAM 后连续通过 I2S 播放，避免网络分块造成断流。TTS 完全在本机 CPU 上运行，回答文本不会被发送给额外的云端语音服务。
+
 ---
 
 ## 常见问题
@@ -259,6 +290,9 @@ ESP32 向 `POST /chat` 发送：
 **屏幕显示`模型请求失败`**
 → 先运行 `docker compose logs llm-gateway`。使用 Ollama 时确认 Ollama 已启动、模型已拉取，并且宿主机的 `11434` 端口允许 Docker 访问；使用云端模型时检查 `.env` 中的接口地址、模型名和 API Key。也可以在 PC 上访问 `http://127.0.0.1:10096/health` 检查网关本身。
 
+**屏幕有回答但扬声器没有声音**
+→ 开机约 2 秒后应先听到短测试音。检查 MAX98357A 是否使用 5V 供电并与 ESP32-S3 共地，确认 BCLK/GPIO15、LRC/GPIO16、DIN/GPIO7 没有接反；不要误把 DIN 接到相邻的 GAIN。扬声器应接在 SPK+ 与 SPK- 之间，任一端都不能接 GND。运行 `docker compose logs llm-gateway`，首次播放时应看到“离线 TTS 模型已加载”。如果屏幕显示“语音播放失败”，同时检查 `TTS_GATEWAY_URL` 的 IP。
+
 **某个汉字在屏幕上不显示**  
 → 默认字体已覆盖 GB2312 一级常用汉字。对于未覆盖的生僻字，把它加入 `esp32s3/main/fonts/app_chinese_chars.txt`，重新生成字体后编译：
 ```powershell
@@ -273,7 +307,8 @@ cmd.exe /c "C:\esp\v5.4.4\esp-idf\export.bat && idf.py build"
 
 | 器件 | 型号 |
 |------|------|
-| 主控 | ESP32-S3 开发板 |
+| 主控 | ESP32-S3 N16R8 开发板（需要 8MB PSRAM 缓存 TTS 音频） |
 | 麦克风 | INMP441 |
 | 屏幕 | ST7789 240×240 |
-| 音频功放（预留） | MAX98357A |
+| 音频功放 | MAX98357A |
+| 扬声器 | 4Ω/3W 或 8Ω/1W |

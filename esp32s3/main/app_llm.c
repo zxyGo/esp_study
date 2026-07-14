@@ -13,6 +13,7 @@
 #include "app_config.h"
 #include "app_lcd.h"
 #include "app_llm.h"
+#include "app_speaker.h"
 
 static const char *TAG = "APP_LLM";
 
@@ -150,6 +151,13 @@ static void llm_task(void *arg)
         if (err == ESP_OK) {
             ESP_LOGI(TAG, "回答: %s", answer);
             app_lcd_show_llm_answer(answer);
+            app_lcd_status_line(188, "正在播放", C_GREEN);
+            esp_err_t play_err = app_speaker_play_text(answer);
+            if (play_err == ESP_OK) {
+                app_lcd_show_llm_answer(answer);
+            } else {
+                app_lcd_status_line(188, "语音播放失败", C_RED);
+            }
         } else {
             app_lcd_status_line(188, "模型请求失败", C_RED);
         }

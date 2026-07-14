@@ -1,6 +1,14 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# MeloTTS 中英双语 ONNX 模型约 163 MB，仅在首次构建镜像时下载。
+ARG TTS_MODEL_URL=https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2
+RUN python -c "import tarfile, urllib.request; p='/tmp/tts-model.tar.bz2'; urllib.request.urlretrieve('${TTS_MODEL_URL}', p); tarfile.open(p, 'r:bz2').extractall('/models', filter='data')" \
+    && rm /tmp/tts-model.tar.bz2
+
 COPY llm_gateway.py /app/llm_gateway.py
 
 EXPOSE 10096

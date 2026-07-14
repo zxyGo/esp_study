@@ -12,6 +12,12 @@
 #define MIC_WS    GPIO_NUM_4   /* I2S 左右声道时钟 WS / LRCLK */
 #define MIC_DIN   GPIO_NUM_6   /* 麦克风数据输出 SD / DOUT，接 ESP32-S3 输入 */
 
+/* MAX98357A I2S 数字功放。DIN 是功放的数据输入，对应 ESP32-S3 的输出。 */
+#define SPEAKER_BCLK GPIO_NUM_15
+#define SPEAKER_WS   GPIO_NUM_16
+#define SPEAKER_DOUT GPIO_NUM_7   /* 按实际接线图连接 MAX98357A DIN */
+#define SPEAKER_SD   GPIO_NUM_18  /* MAX98357A SD/MODE，高电平使能功放 */
+
 /* ST7789 屏幕引脚：SPI 屏幕只需要 MOSI，不需要 MISO。 */
 #define LCD_SCLK  GPIO_NUM_21  /* SPI 时钟 SCL / SCK */
 #define LCD_MOSI  GPIO_NUM_47  /* SPI 数据 SDA / MOSI */
@@ -71,3 +77,10 @@
 #define LLM_PROMPT_MAX_BYTES   256
 #define LLM_RESPONSE_MAX_BYTES 4096
 #define LLM_ANSWER_MAX_BYTES   1024
+
+/* 离线 MeloTTS 模型输出 44.1 kHz、单声道 PCM16；固件会复制到左右声道。 */
+#define TTS_GATEWAY_URL          "http://10.10.1.73:10096/tts"
+#define TTS_SAMPLE_RATE          44100
+#define TTS_REQUEST_TIMEOUT_MS   70000
+#define TTS_MAX_AUDIO_BYTES      (4 * 1024 * 1024)
+#define SPEAKER_ECHO_GUARD_MS    350

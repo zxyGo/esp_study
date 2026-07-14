@@ -4,6 +4,7 @@ idf_component_register(SRCS "main.c"
                          "app_wifi.c"
                          "app_stt.c"
                          "app_llm.c"
+                         "app_speaker.c"
                          "fonts/app_font_chinese_16.c"
                     INCLUDE_DIRS "."
                     REQUIRES esp_driver_gpio esp_driver_i2s esp_driver_spi esp_lcd

@@ -65,6 +65,11 @@ services:
       LLM_THINKING: ${LLM_THINKING:-}
       LLM_HISTORY_TURNS: ${LLM_HISTORY_TURNS:-4}
       LLM_REQUEST_TIMEOUT: ${LLM_REQUEST_TIMEOUT:-60}
+      TTS_MODEL_DIR: ${TTS_MODEL_DIR:-/models/vits-melo-tts-zh_en}
+      TTS_SPEED: ${TTS_SPEED:-1.0}
+      TTS_NUM_THREADS: ${TTS_NUM_THREADS:-2}
+      TTS_MAX_AUDIO_BYTES: ${TTS_MAX_AUDIO_BYTES:-4194304}
+      TTS_TARGET_PEAK: ${TTS_TARGET_PEAK:-0.25}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
