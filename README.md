@@ -1,6 +1,6 @@
 # ESP32-S3 本地语音助手（FunASR + 大模型）
 
-ESP32-S3 采集麦克风音频，通过 Wi-Fi 实时推送到本地 FunASR；完整识别文本再交给大模型，回答显示在 ST7789 屏幕上，并通过 MAX98357A 扬声器播放。语音合成使用电脑上的 sherpa-onnx + MeloTTS 中英双语模型，完全离线且没有按次调用费。大模型默认连接本机 Ollama，也可以切换到云端 OpenAI Chat Completions 兼容接口，API Key 只保存在电脑端，不会写入固件。
+ESP32-S3 采集麦克风音频，通过 Wi-Fi 实时推送到本地 FunASR；说出“你好，禹神”唤醒后，完整识别文本再交给大模型，回答显示在 ST7789 屏幕上，并通过 MAX98357A 扬声器播放。语音合成使用电脑上的 sherpa-onnx + MeloTTS 中英双语模型，完全离线且没有按次调用费。大模型默认连接本机 Ollama，也可以切换到云端 OpenAI Chat Completions 兼容接口，API Key 只保存在电脑端，不会写入固件。
 
 ---
 
@@ -59,6 +59,8 @@ docker compose logs -f funasr llm-gateway
 FunASR 监听 `ws://0.0.0.0:10095`，LLM 网关监听 `http://0.0.0.0:10096`；二者都只应暴露在可信局域网中。
 
 当前 Compose 配置运行 FunASR 2pass 服务，并加载离线识别、在线识别、VAD、标点、ITN 和语言模型。识别模型保存在 Docker 命名卷 `funasr-models` 中；MeloTTS 模型包含在构建后的网关镜像里，后续启动无需重复下载。LLM 网关保留最近 4 轮对话上下文，可以通过 `.env` 调整。
+
+`server/hotwords.txt` 会把“你好禹神”以权重 30 加入 FunASR，提高唤醒短语的识别稳定性；ESP32 握手时也会发送同一热词配置。
 
 ---
 
@@ -166,14 +168,19 @@ cmd.exe /c "C:\esp\v5.4.4\esp-idf\export.bat && idf.py -p COM4 flash monitor"
 | 网络   | `网络:已连接`（绿色）|
 | 服务   | `服务:已连接`（绿色）|
 | 麦克风 | `麦克风: xx%`，按最近 300 ms 的峰值动态变化 |
-| 主区域 | 先显示识别问题和`正在思考`，随后显示并播放大模型回答 |
+| 主区域 | 初始提示说“你好，禹神”；唤醒后显示问题和`正在思考`，随后显示并播放大模型回答 |
+
+可以先单独说“你好，禹神”，助手会回复“有什么需要帮助吗？”，然后等待提问；也可以一次说完，例如“你好，禹神，今天天气怎么样”，此时不会播放固定回复，只会把“今天天气怎么样”提交给大模型。单独唤醒后 60 秒仍没有提问会自动回到待唤醒状态，之后必须重新说唤醒词。没有唤醒时识别到的其他语句会被忽略。
+
+唤醒判断会忽略空格和标点，并按 Unicode 汉字做编辑距离匹配，默认允许一个字被识错、漏识别或多识别。因此“你好雨神”“您好禹神”“你好神”“你好吗禹神”等常见识别偏差也能唤醒；“你好余生”“你好雨声”等两个字都不同但读音接近的结果也在专用白名单内。匹配仍限定在句首，模糊阈值可通过 `WAKE_FUZZY_MAX_EDITS` 调整；不建议设为 2，以免四字唤醒词过度宽松导致误唤醒。
 
 串口同时打印：
 
 ```
-I (xxxx) APP_STT: [在线] 你好
-I (xxxx) APP_STT: [离线] 你好，今天天气怎么样？
-I (xxxx) APP_LLM: 提问: 你好，今天天气怎么样？
+I (xxxx) APP_STT: [在线] 你好，禹神
+I (xxxx) APP_STT: [离线] 你好，禹神，今天天气怎么样？
+I (xxxx) APP_STT: [提问] 今天天气怎么样？
+I (xxxx) APP_LLM: 提问: 今天天气怎么样？
 I (xxxx) APP_LLM: 回答: 我无法获取实时天气，但可以帮你分析天气信息。
 I (xxxx) APP_SPEAKER: 正在合成并播放回答
 I (xxxx) APP_SPEAKER: 语音播放完成
@@ -210,6 +217,7 @@ I (xxxx) APP_SPEAKER: 语音播放完成
 │       └── gen_lvgl_font.ps1         # 合并字符集并重新生成字体
 └── server/
     ├── docker-compose.yml            # FunASR + LLM 网关编排
+    ├── hotwords.txt                  # FunASR 静态热词与权重
     ├── llm_gateway.py                # OpenAI 兼容网关与短期会话记忆
     ├── requirements.txt              # sherpa-onnx 与 NumPy 版本
     ├── Dockerfile.llm
@@ -243,7 +251,7 @@ cmd.exe /c "C:\esp\v5.4.4\esp-idf\export.bat && idf.py build"
 | 步骤 | 内容 |
 |------|------|
 | 连接 | `ws://server:10095`，无 TLS，无鉴权 |
-| 握手 | 发送 JSON：`{"mode":"2pass","is_speaking":true,"wav_format":"pcm","audio_fs":16000,...}` |
+| 握手 | 发送 JSON：`{"mode":"2pass","is_speaking":true,"wav_format":"pcm","audio_fs":16000,"hotwords":"{\"你好禹神\":30}",...}` |
 | 音频 | 持续发送**原始二进制 PCM16**（每包 480 帧 = 30 ms） |
 | 结果 | `mode:"2pass-online"` 实时片段；`mode:"2pass-offline"` VAD 断句后完整句子 |
 | 断句 | 服务端 VAD 自动检测静音，客户端无需主动提交 |

@@ -12,6 +12,7 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 #include "app_config.h"
@@ -32,6 +33,7 @@ typedef struct {
 
 static i2s_chan_handle_t s_tx;
 static volatile bool s_playing;
+static SemaphoreHandle_t s_play_mutex;
 static int16_t s_stereo_buffer[512 * 2];
 
 static esp_err_t write_mono_pcm_as_stereo(speaker_response_t *response,
@@ -175,6 +177,10 @@ static esp_err_t play_buffered_pcm(speaker_response_t *response)
 
 void app_speaker_init(void)
 {
+    if (!s_play_mutex) {
+        s_play_mutex = xSemaphoreCreateMutex();
+        ESP_ERROR_CHECK(s_play_mutex ? ESP_OK : ESP_ERR_NO_MEM);
+    }
     if (s_tx) return;
 
     /* MAX98357A 的 SD/MODE 内部下拉；悬空时芯片处于关断状态。 */
@@ -234,6 +240,13 @@ esp_err_t app_speaker_play_text(const char *text)
         return ESP_ERR_NO_MEM;
     }
 
+    /* 大模型回答和固定唤醒回复可能来自不同任务，串行访问 I2S 与共享缓冲区。 */
+    if (!s_play_mutex || xSemaphoreTake(s_play_mutex, portMAX_DELAY) != pdTRUE) {
+        esp_http_client_cleanup(client);
+        free(post_data);
+        return ESP_FAIL;
+    }
+
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
     s_playing = true;
@@ -264,6 +277,7 @@ esp_err_t app_speaker_play_text(const char *text)
     esp_http_client_cleanup(client);
     heap_caps_free(response.audio);
     free(post_data);
+    xSemaphoreGive(s_play_mutex);
     return result;
 }
 

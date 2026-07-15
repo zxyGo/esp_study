@@ -13,6 +13,7 @@ services:
       - "10095:10095"
     volumes:
       - funasr-models:/workspace/models
+      - ./hotwords.txt:/workspace/FunASR/runtime/websocket/hotwords.txt:ro
     restart: unless-stopped
     shm_size: "1g"
     # 镜像内的包装脚本路径在不同版本间有变化，直接启动 2pass 服务二进制更稳定。

@@ -180,7 +180,7 @@ void app_lcd_draw_stt_frame(void)
         create_label(&s_wifi_label, "网络:等待", 30, C_BLACK);
         create_label(&s_ws_label, "服务:等待", 54, C_BLACK);
         create_label(&s_mic_label, "麦克风:  0%", 78, C_GREEN);
-        create_label(&s_hint_label, "等待提问", 216, C_ORANGE);
+        create_label(&s_hint_label, "请说：你好，禹神", 216, C_ORANGE);
 
         s_text_label = lv_label_create(scr);
         apply_chinese_font(s_text_label);
@@ -208,6 +208,21 @@ void app_lcd_status_line(int y, const char *text, uint16_t color)
     }
 }
 
+void app_lcd_show_wake_hint(void)
+{
+    if (lvgl_port_lock(0)) {
+        if (s_text_label) {
+            lv_label_set_text(s_text_label, WAKE_WORD_DISPLAY);
+            lv_obj_set_style_text_color(s_text_label, lv_palette_main(LV_PALETTE_GREEN), 0);
+        }
+        if (s_hint_label) {
+            lv_label_set_text(s_hint_label, "已唤醒，请提问");
+            lv_obj_set_style_text_color(s_hint_label, lv_palette_main(LV_PALETTE_GREEN), 0);
+        }
+        lvgl_port_unlock();
+    }
+}
+
 void app_lcd_show_transcript_hint(const char *text)
 {
     /* text 是 UTF-8 字符串，字体已包含 GB2312 一级常用汉字。
@@ -232,7 +247,7 @@ void app_lcd_show_llm_answer(const char *text)
             lv_obj_set_style_text_color(s_text_label, lv_palette_main(LV_PALETTE_CYAN), 0);
         }
         if (s_hint_label) {
-            lv_label_set_text(s_hint_label, "大模型回答");
+            lv_label_set_text(s_hint_label, "请说：你好，禹神");
             lv_obj_set_style_text_color(s_hint_label, lv_palette_main(LV_PALETTE_GREEN), 0);
         }
         lvgl_port_unlock();

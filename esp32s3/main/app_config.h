@@ -55,6 +55,15 @@
 #define BUF_SAMPLES          (STT_CHUNK_FRAMES * 2) /* I2S 读左右双声道 */
 #define VOLUME_INITIAL_FULL_SCALE  2000
 
+/* 只有说出“你好，禹神”才会把后续问题交给大模型。唤醒后需在 15 秒内提问；
+ * 也可以直接说“你好，禹神，今天天气怎么样”。识别文本允许一个汉字被
+ * 替换、漏识别或多识别；JSON 热词权重则用于提高准确识别概率。 */
+#define WAKE_WORD_DISPLAY       "你好，禹神"
+#define WAKE_REPLY_TEXT         "有什么需要帮助吗？"
+#define WAKE_HOTWORDS_JSON      "{\"你好禹神\":30}"
+#define WAKE_FUZZY_MAX_EDITS    1
+#define WAKE_LISTEN_TIMEOUT_MS  60000
+
 /* ================================================================
  * Wi-Fi 网页配网配置
  * ================================================================ */
