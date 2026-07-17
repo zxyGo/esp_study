@@ -34,6 +34,104 @@ static volatile bool s_waiting_for_question;
 static TickType_t s_wake_tick;
 static TimerHandle_t s_wake_timeout_timer;
 static TaskHandle_t s_wake_reply_task;
+static int s_last_nonzero_volume = SPEAKER_VOLUME_DEFAULT;
+
+static bool contains_any(const char *text, const char *const *needles,
+                         size_t needle_count)
+{
+    for (size_t i = 0; i < needle_count; ++i) {
+        if (strstr(text, needles[i])) return true;
+    }
+    return false;
+}
+
+static bool parse_volume_percent(const char *text, int *percent)
+{
+    for (const char *p = text; *p; ++p) {
+        if (*p < '0' || *p > '9') continue;
+
+        int value = 0;
+        do {
+            value = value * 10 + (*p - '0');
+            if (value > 100) return false;
+            ++p;
+        } while (*p >= '0' && *p <= '9');
+        *percent = value;
+        return true;
+    }
+    return false;
+}
+
+/* 返回 true 表示这是本地音量指令，调用方不再把它提交给大模型。 */
+static bool handle_volume_command(const char *text)
+{
+    static const char *const unmute_words[] = {
+        "取消静音", "解除静音", "打开声音", "恢复声音"
+    };
+    static const char *const mute_words[] = {
+        "静音", "关闭声音", "关掉声音"
+    };
+    static const char *const louder_words[] = {
+        "大一点", "大点", "大声一点", "大声点", "调大", "调高", "增大", "提高"
+    };
+    static const char *const quieter_words[] = {
+        "小一点", "小点", "小声一点", "小声点", "调小", "调低", "减小", "降低"
+    };
+    static const char *const target_words[] = {
+        "调到", "调成", "设置", "设为", "设成", "百分之", "%"
+    };
+
+    bool has_subject = strstr(text, "音量") || strstr(text, "声音");
+    int current = app_speaker_get_volume();
+    int requested = current;
+
+    if (contains_any(text, unmute_words,
+                     sizeof(unmute_words) / sizeof(unmute_words[0]))) {
+        requested = s_last_nonzero_volume > 0 ? s_last_nonzero_volume
+                                               : SPEAKER_VOLUME_DEFAULT;
+    } else if (contains_any(text, mute_words,
+                            sizeof(mute_words) / sizeof(mute_words[0]))) {
+        if (current > 0) s_last_nonzero_volume = current;
+        requested = 0;
+    } else if (has_subject &&
+               (strstr(text, "最大") || strstr(text, "最高"))) {
+        requested = 100;
+    } else if (has_subject &&
+               (strstr(text, "最小") || strstr(text, "最低"))) {
+        requested = SPEAKER_VOLUME_STEP;
+    } else if (has_subject &&
+               contains_any(text, target_words,
+                            sizeof(target_words) / sizeof(target_words[0])) &&
+               parse_volume_percent(text, &requested)) {
+        /* 数字已解析到 requested。 */
+    } else if ((has_subject || strstr(text, "大声一点") || strstr(text, "大声点")) &&
+               contains_any(text, louder_words,
+                            sizeof(louder_words) / sizeof(louder_words[0]))) {
+        requested = current + SPEAKER_VOLUME_STEP;
+    } else if ((has_subject || strstr(text, "小声一点") || strstr(text, "小声点")) &&
+               contains_any(text, quieter_words,
+                            sizeof(quieter_words) / sizeof(quieter_words[0]))) {
+        requested = current - SPEAKER_VOLUME_STEP;
+    } else {
+        return false;
+    }
+
+    if (requested < 0) requested = 0;
+    if (requested > 100) requested = 100;
+    if (requested > 0) s_last_nonzero_volume = requested;
+    app_speaker_set_volume(requested);
+    app_lcd_set_speaker_volume(requested);
+
+    char result[48];
+    if (requested == 0) {
+        snprintf(result, sizeof(result), "扬声器已静音");
+    } else {
+        snprintf(result, sizeof(result), "音量已调到 %d%%", requested);
+    }
+    ESP_LOGI(TAG, "[音量指令] %s -> %s", text, result);
+    app_lcd_show_llm_answer(result);
+    return true;
+}
 
 static void stt_send_start(void)
 {
@@ -311,6 +409,7 @@ static void handle_final_text(const char *text)
 {
     unsigned matched_edits = 0;
     const char *command = match_wake_prefix(text, &matched_edits);
+    const char *request_text = NULL;
     if (command) {
         ESP_LOGI(TAG, "唤醒词模糊匹配成功: 编辑距离=%u, 识别文本=%s",
                  matched_edits, text);
@@ -332,15 +431,18 @@ static void handle_final_text(const char *text)
         /* 唤醒词和问题在同一句时，去掉唤醒词，只把实际问题发给大模型。 */
         s_waiting_for_question = false;
         cancel_wake_timeout();
-        snprintf(s_last_text, sizeof(s_last_text), "%s", command);
+        request_text = command;
     } else if (wake_window_is_open()) {
         s_waiting_for_question = false;
         cancel_wake_timeout();
-        snprintf(s_last_text, sizeof(s_last_text), "%s", text);
+        request_text = text;
     } else {
         ESP_LOGI(TAG, "[未唤醒] 忽略: %s", text);
         return;
     }
+
+    if (handle_volume_command(request_text)) return;
+    snprintf(s_last_text, sizeof(s_last_text), "%s", request_text);
 
     ESP_LOGI(TAG, "[提问] %s", s_last_text);
     app_lcd_show_transcript_hint(s_last_text);

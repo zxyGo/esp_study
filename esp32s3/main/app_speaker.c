@@ -14,6 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "nvs.h"
 
 #include "app_config.h"
 #include "app_speaker.h"
@@ -33,8 +34,26 @@ typedef struct {
 
 static i2s_chan_handle_t s_tx;
 static volatile bool s_playing;
+static volatile int s_volume_percent = SPEAKER_VOLUME_DEFAULT;
 static SemaphoreHandle_t s_play_mutex;
 static int16_t s_stereo_buffer[512 * 2];
+
+#define SPEAKER_NVS_NAMESPACE "audio_cfg"
+#define SPEAKER_NVS_VOLUME_KEY "volume"
+
+static void load_saved_volume(void)
+{
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open(SPEAKER_NVS_NAMESPACE, NVS_READONLY, &nvs);
+    if (err != ESP_OK) return;
+
+    uint8_t saved_volume = SPEAKER_VOLUME_DEFAULT;
+    err = nvs_get_u8(nvs, SPEAKER_NVS_VOLUME_KEY, &saved_volume);
+    nvs_close(nvs);
+    if (err == ESP_OK && saved_volume <= 100) {
+        s_volume_percent = saved_volume;
+    }
+}
 
 static esp_err_t write_mono_pcm_as_stereo(speaker_response_t *response,
                                           const uint8_t *data, size_t length)
@@ -63,6 +82,11 @@ static esp_err_t write_mono_pcm_as_stereo(speaker_response_t *response,
         }
 
         int16_t sample = (int16_t)((uint16_t)low | ((uint16_t)high << 8));
+        int volume = s_volume_percent;
+        int32_t scaled = (int32_t)sample * volume;
+        /* 对正负样本做对称的四舍五入，0% 输出静音，100% 保持原始 PCM。 */
+        scaled = scaled >= 0 ? (scaled + 50) / 100 : (scaled - 50) / 100;
+        sample = (int16_t)scaled;
         s_stereo_buffer[frames * 2] = sample;
         s_stereo_buffer[frames * 2 + 1] = sample;
         frames++;
@@ -183,6 +207,9 @@ void app_speaker_init(void)
     }
     if (s_tx) return;
 
+    /* app_main 在 Wi-Fi 初始化（同时初始化 NVS）后调用本函数。 */
+    load_saved_volume();
+
     /* MAX98357A 的 SD/MODE 内部下拉；悬空时芯片处于关断状态。 */
     ESP_ERROR_CHECK(gpio_set_direction(SPEAKER_SD, GPIO_MODE_OUTPUT));
     ESP_ERROR_CHECK(gpio_set_level(SPEAKER_SD, 1));
@@ -207,8 +234,9 @@ void app_speaker_init(void)
 
     ESP_ERROR_CHECK(i2s_channel_init_std_mode(s_tx, &std_cfg));
     ESP_ERROR_CHECK(i2s_channel_enable(s_tx));
-    ESP_LOGI(TAG, "MAX98357A 已初始化: BCLK=%d, WS=%d, DIN=%d, SD=%d, %d Hz",
-             SPEAKER_BCLK, SPEAKER_WS, SPEAKER_DOUT, SPEAKER_SD, TTS_SAMPLE_RATE);
+    ESP_LOGI(TAG, "MAX98357A 已初始化: BCLK=%d, WS=%d, DIN=%d, SD=%d, %d Hz, 音量=%d%%",
+             SPEAKER_BCLK, SPEAKER_WS, SPEAKER_DOUT, SPEAKER_SD, TTS_SAMPLE_RATE,
+             s_volume_percent);
 }
 
 esp_err_t app_speaker_play_text(const char *text)
@@ -284,4 +312,29 @@ esp_err_t app_speaker_play_text(const char *text)
 bool app_speaker_is_playing(void)
 {
     return s_playing;
+}
+
+esp_err_t app_speaker_set_volume(int percent)
+{
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
+    s_volume_percent = percent;
+
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open(SPEAKER_NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) {
+        err = nvs_set_u8(nvs, SPEAKER_NVS_VOLUME_KEY, (uint8_t)percent);
+        if (err == ESP_OK) err = nvs_commit(nvs);
+        nvs_close(nvs);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "保存音量失败: %s", esp_err_to_name(err));
+    }
+    ESP_LOGI(TAG, "扬声器音量已设置为 %d%%", percent);
+    return err;
+}
+
+int app_speaker_get_volume(void)
+{
+    return s_volume_percent;
 }

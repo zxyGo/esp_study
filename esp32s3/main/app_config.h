@@ -60,7 +60,7 @@
  * 替换、漏识别或多识别；JSON 热词权重则用于提高准确识别概率。 */
 #define WAKE_WORD_DISPLAY       "你好，禹神"
 #define WAKE_REPLY_TEXT         "有什么需要帮助吗？"
-#define WAKE_HOTWORDS_JSON      "{\"你好禹神\":30}"
+#define WAKE_HOTWORDS_JSON      "{\"你好禹神\":30,\"音量\":20,\"静音\":20}"
 #define WAKE_FUZZY_MAX_EDITS    1
 #define WAKE_LISTEN_TIMEOUT_MS  60000
 
@@ -93,3 +93,5 @@
 #define TTS_REQUEST_TIMEOUT_MS   70000
 #define TTS_MAX_AUDIO_BYTES      (4 * 1024 * 1024)
 #define SPEAKER_ECHO_GUARD_MS    350
+#define SPEAKER_VOLUME_DEFAULT   100  /* 0~100；100 保持 TTS 原始幅度，不额外放大 */
+#define SPEAKER_VOLUME_STEP      10   /* “声音大/小一点”每次调整的百分比 */

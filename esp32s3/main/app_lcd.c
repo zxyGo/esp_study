@@ -19,6 +19,7 @@ static lv_obj_t *s_title;
 static lv_obj_t *s_wifi_label;
 static lv_obj_t *s_ws_label;
 static lv_obj_t *s_mic_label;
+static lv_obj_t *s_volume_label;
 static lv_obj_t *s_hint_label;
 static lv_obj_t *s_text_label;
 
@@ -180,6 +181,16 @@ void app_lcd_draw_stt_frame(void)
         create_label(&s_wifi_label, "网络:等待", 30, C_BLACK);
         create_label(&s_ws_label, "服务:等待", 54, C_BLACK);
         create_label(&s_mic_label, "麦克风:  0%", 78, C_GREEN);
+        lv_obj_set_width(s_mic_label, 116);
+
+        s_volume_label = lv_label_create(scr);
+        apply_chinese_font(s_volume_label);
+        lv_label_set_text(s_volume_label, "音量:100%");
+        lv_obj_set_width(s_volume_label, 108);
+        lv_obj_set_style_text_align(s_volume_label, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_set_style_text_color(s_volume_label,
+                                    lv_palette_main(LV_PALETTE_CYAN), 0);
+        lv_obj_align(s_volume_label, LV_ALIGN_TOP_RIGHT, -8, 78);
         create_label(&s_hint_label, "请说：你好，禹神", 216, C_ORANGE);
 
         s_text_label = lv_label_create(scr);
@@ -252,4 +263,13 @@ void app_lcd_show_llm_answer(const char *text)
         }
         lvgl_port_unlock();
     }
+}
+
+void app_lcd_set_speaker_volume(int percent)
+{
+    char text[20];
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
+    snprintf(text, sizeof(text), "音量:%3d%%", percent);
+    label_set(s_volume_label, text, percent == 0 ? C_RED : C_CYAN);
 }

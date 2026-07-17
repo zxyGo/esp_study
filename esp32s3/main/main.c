@@ -18,13 +18,15 @@ void app_main(void)
     /* main.c 只负责整体流程：初始化硬件、联网、启动语音转写、循环发送音频。 */
     app_lcd_init();
     app_mic_init();
-    app_speaker_init();
 
     app_lcd_show_boot();
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     app_lcd_draw_stt_frame();
+    /* Wi-Fi 初始化会先初始化 NVS，扬声器随后从中恢复上次保存的音量。 */
     app_wifi_init();
+    app_speaker_init();
+    app_lcd_set_speaker_volume(app_speaker_get_volume());
 
     int16_t pcm[STT_CHUNK_FRAMES];
     /* 音量条使用一个会自动回落的参考峰值。旧实现记录“开机以来最大值”且永不

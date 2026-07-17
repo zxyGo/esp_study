@@ -11,3 +11,7 @@ esp_err_t app_speaker_play_text(const char *text);
 
 /* 从发起 TTS 到播放结束后的回声保护期内均返回 true。 */
 bool app_speaker_is_playing(void);
+
+/* 设置/读取播放音量百分比。设置值会限制到 0~100 并保存到 NVS。 */
+esp_err_t app_speaker_set_volume(int percent);
+int app_speaker_get_volume(void);
