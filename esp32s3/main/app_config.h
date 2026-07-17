@@ -16,7 +16,7 @@
 #define SPEAKER_BCLK GPIO_NUM_15
 #define SPEAKER_WS   GPIO_NUM_16
 #define SPEAKER_DOUT GPIO_NUM_7   /* 按实际接线图连接 MAX98357A DIN */
-#define SPEAKER_SD   GPIO_NUM_18  /* MAX98357A SD/MODE，高电平使能功放 */
+#define SPEAKER_SD   GPIO_NUM_8   /* GPIO18 留给 GPS TX；功放 SD/MODE 改接 GPIO8 */
 
 /* ST7789 屏幕引脚：SPI 屏幕只需要 MOSI，不需要 MISO。 */
 #define LCD_SCLK  GPIO_NUM_21  /* SPI 时钟 SCL / SCK */
@@ -25,6 +25,13 @@
 #define LCD_DC    GPIO_NUM_40  /* 数据/命令选择 D/C */
 #define LCD_RST   GPIO_NUM_45  /* 复位 RST / RES */
 #define LCD_BL    GPIO_NUM_42  /* 背光 BLK / BL，高电平点亮 */
+
+/* UART GPS 模块（NMEA 0183，默认 9600 baud）。
+ * 最少只需连接 GPS TX -> ESP32 GPS_RX；GPS RX 和 PPS 暂不使用也可以不接。 */
+#define GPS_UART       UART_NUM_1
+#define GPS_RX         GPIO_NUM_17  /* GPS TX 接到此引脚 */
+#define GPS_TX         GPIO_NUM_18  /* GPS RXD 接到此引脚 */
+#define GPS_BAUD_RATE  9600
 
 /* ================================================================
  * 屏幕与颜色配置

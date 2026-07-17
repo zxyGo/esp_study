@@ -20,6 +20,9 @@ static lv_obj_t *s_wifi_label;
 static lv_obj_t *s_ws_label;
 static lv_obj_t *s_mic_label;
 static lv_obj_t *s_volume_label;
+static lv_obj_t *s_gps_lat_label;
+static lv_obj_t *s_gps_lon_label;
+static lv_obj_t *s_gps_utc_label;
 static lv_obj_t *s_hint_label;
 static lv_obj_t *s_text_label;
 
@@ -178,9 +181,9 @@ void app_lcd_draw_stt_frame(void)
         lv_obj_set_style_text_color(s_title, lv_palette_main(LV_PALETTE_CYAN), 0);
         lv_obj_align(s_title, LV_ALIGN_TOP_MID, 0, 4);
 
-        create_label(&s_wifi_label, "网络:等待", 30, C_BLACK);
-        create_label(&s_ws_label, "服务:等待", 54, C_BLACK);
-        create_label(&s_mic_label, "麦克风:  0%", 78, C_GREEN);
+        create_label(&s_wifi_label, "网络:等待", 26, C_BLACK);
+        create_label(&s_ws_label, "服务:等待", 47, C_BLACK);
+        create_label(&s_mic_label, "麦克风:  0%", 68, C_GREEN);
         lv_obj_set_width(s_mic_label, 116);
 
         s_volume_label = lv_label_create(scr);
@@ -190,17 +193,20 @@ void app_lcd_draw_stt_frame(void)
         lv_obj_set_style_text_align(s_volume_label, LV_TEXT_ALIGN_RIGHT, 0);
         lv_obj_set_style_text_color(s_volume_label,
                                     lv_palette_main(LV_PALETTE_CYAN), 0);
-        lv_obj_align(s_volume_label, LV_ALIGN_TOP_RIGHT, -8, 78);
+        lv_obj_align(s_volume_label, LV_ALIGN_TOP_RIGHT, -8, 68);
+        create_label(&s_gps_lat_label, "LAT: waiting for GPS", 92, C_YELLOW);
+        create_label(&s_gps_lon_label, "LON: waiting for GPS", 113, C_YELLOW);
+        create_label(&s_gps_utc_label, "UTC: --:--:--", 134, C_BLACK);
         create_label(&s_hint_label, "请说：你好，禹神", 216, C_ORANGE);
 
         s_text_label = lv_label_create(scr);
         apply_chinese_font(s_text_label);
         lv_label_set_text(s_text_label, "");
         lv_obj_set_width(s_text_label, LCD_W - 16);
-        lv_obj_set_height(s_text_label, 104);
+        lv_obj_set_height(s_text_label, 53);
         lv_label_set_long_mode(s_text_label, LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_color(s_text_label, lv_palette_main(LV_PALETTE_ORANGE), 0);
-        lv_obj_align(s_text_label, LV_ALIGN_TOP_LEFT, 8, 106);
+        lv_obj_align(s_text_label, LV_ALIGN_TOP_LEFT, 8, 158);
 
         lvgl_port_unlock();
     }
@@ -272,4 +278,26 @@ void app_lcd_set_speaker_volume(int percent)
     if (percent > 100) percent = 100;
     snprintf(text, sizeof(text), "音量:%3d%%", percent);
     label_set(s_volume_label, text, percent == 0 ? C_RED : C_CYAN);
+}
+
+void app_lcd_set_gps(double latitude, double longitude, const char *utc,
+                     bool fix_valid)
+{
+    char lat_text[32];
+    char lon_text[32];
+    char utc_text[24];
+
+    if (fix_valid) {
+        snprintf(lat_text, sizeof(lat_text), "LAT: %+.6f", latitude);
+        snprintf(lon_text, sizeof(lon_text), "LON: %+.6f", longitude);
+    } else {
+        snprintf(lat_text, sizeof(lat_text), "LAT: waiting for GPS");
+        snprintf(lon_text, sizeof(lon_text), "LON: waiting for GPS");
+    }
+    snprintf(utc_text, sizeof(utc_text), "UTC: %s",
+             (utc && utc[0]) ? utc : "--:--:--");
+
+    label_set(s_gps_lat_label, lat_text, fix_valid ? C_GREEN : C_YELLOW);
+    label_set(s_gps_lon_label, lon_text, fix_valid ? C_GREEN : C_YELLOW);
+    label_set(s_gps_utc_label, utc_text, (utc && utc[0]) ? C_CYAN : C_BLACK);
 }

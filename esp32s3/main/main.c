@@ -10,6 +10,7 @@
 #include "app_stt.h"
 #include "app_llm.h"
 #include "app_speaker.h"
+#include "app_gps.h"
 
 static const char *TAG = "APP_MAIN";
 
@@ -23,6 +24,7 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     app_lcd_draw_stt_frame();
+    app_gps_init();
     /* Wi-Fi 初始化会先初始化 NVS，扬声器随后从中恢复上次保存的音量。 */
     app_wifi_init();
     app_speaker_init();
