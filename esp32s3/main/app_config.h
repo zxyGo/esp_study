@@ -26,6 +26,13 @@
 #define LCD_RST   GPIO_NUM_45  /* 复位 RST / RES */
 #define LCD_BL    GPIO_NUM_42  /* 背光 BLK / BL，高电平点亮 */
 
+/* UART GPS 模块（NMEA 0183，默认 9600 baud）。
+ * GPS TXD -> GPIO9；GPS RXD -> GPIO10（只接收定位时可不接）。 */
+#define GPS_UART       UART_NUM_1
+#define GPS_RX         GPIO_NUM_9
+#define GPS_TX         GPIO_NUM_10
+#define GPS_BAUD_RATE  9600
+
 /* ================================================================
  * 屏幕与颜色配置
  * ================================================================ */
